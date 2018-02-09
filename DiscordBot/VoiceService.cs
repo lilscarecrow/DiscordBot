@@ -6,13 +6,17 @@ using Discord.Commands;
 using Discord.WebSocket;
 using System.Speech.Recognition;
 using System.Collections;
+using System.Speech.AudioFormat;
+using Discord.Audio;
+using System.IO;
 
 namespace DiscordBot
 {
     public class VoiceService
     {
-        public IDependencyMap DependencyMap { get; set; }
-        public CommandService CommandService { get; set; }
+        public ConfigHandler config;
+        public AudioService audio;
+        public DiscordBot client;
 
         private SpeechRecognitionEngine recEngine = new SpeechRecognitionEngine();
         private SocketCommandContext Context = null;
@@ -20,15 +24,17 @@ namespace DiscordBot
         private ArrayList arrList;
         private bool listening = false;
 
-        public VoiceService()
+        public VoiceService(ConfigHandler conf, AudioService aud, DiscordBot dis)
         {
-             
+            config = conf;
+            audio = aud;
+            client = dis;
         }
 
-        public void init(Dictionary<string, string> songList)
+        public async Task init(Dictionary<string, string> songList)
         {
             arrList = new ArrayList();
-            arrList.AddRange(DependencyMap.Get<ConfigHandler>().getSpeechArgs());
+            arrList.AddRange(config.getSpeechArgs());
 
             foreach (string song in songList.Keys)
             {
@@ -46,13 +52,25 @@ namespace DiscordBot
             recEngine.LoadGrammarAsync(grammar);
 
             recEngine.SpeechRecognized += RecEngine_SpeechRecognized;
+
+            await Task.CompletedTask;
         }
 
         public void setContext(SocketCommandContext c)
         {
             Context = c;
             SocketGuildUser s = c.User as SocketGuildUser;
-            //recEngine.SetInputToAudioStream(s.AudioStream, new SpeechAudioFormatInfo(1920, AudioBitsPerSample.Sixteen, AudioChannel.Stereo));//OH BOY
+            try
+            {
+                var format = new SpeechAudioFormatInfo(1920, AudioBitsPerSample.Sixteen, AudioChannel.Stereo);
+                var stream = s.AudioStream;
+                //recEngine.SetInputToAudioStream(stream, format);//OH BOY
+            }
+            catch (Exception e)
+            {
+                Console.WriteLine(s.Username + " AND THE MESSAGE IS: " + e.Message);
+            }
+            
             recEngine.SetInputToDefaultAudioDevice();
             recEngine.RecognizeAsync(RecognizeMode.Multiple);
         }
@@ -86,44 +104,44 @@ namespace DiscordBot
                 if (e.Result.Text.Equals(arrList[0]))
                 {
                     setActive();
-                    await DependencyMap.Get<AudioService>().SendTextAsync(Context, "That's Me!");
+                    await audio.SendTextAsync(Context, "That's Me!");
                 }     
                 else
                     return;
             }
             if (e.Result.Text.Contains("play the song"))
             {
-                var audioClient = await DependencyMap.Get<AudioService>().ConnectAudio(Context);
+                var audioClient = await audio.ConnectAudio(Context);
                 if (audioClient == null)
                     return;
-                DependencyMap.Get<AudioService>().SendAsync(audioClient, songList[e.Result.Text.Split(' ').Last()]);
+                audio.SendAsync(audioClient, songList[e.Result.Text.Split(' ').Last()]);
             }
             else if (e.Result.Text.Equals(arrList[1]))
             {
-                await DependencyMap.Get<AudioService>().SendTextAsync(Context, "Yeah!");
+                await audio.SendTextAsync(Context, "Yeah!");
             }
             else if (e.Result.Text.Equals(arrList[2]))
             {
-                await DependencyMap.Get<AudioService>().SendFileAsync(Context, DependencyMap.Get<ConfigHandler>().getSongDir() + @"\Pictures\doggo.jpg");
+                await audio.SendFileAsync(Context, config.getSongDir() + @"\Pictures\doggo.jpg");
             }
             else if (e.Result.Text.Equals(arrList[3]))
             {
-                await DependencyMap.Get<AudioService>().SendFileAsync(Context, DependencyMap.Get<ConfigHandler>().getSongDir() + @"\Pictures\comm_abby.PNG");
+                await audio.SendFileAsync(Context, config.getSongDir() + @"\Pictures\comm_abby.PNG");
             }
             else if (e.Result.Text.Equals(arrList[4]))
             {
-                await DependencyMap.Get<AudioService>().SendFileAsync(Context, DependencyMap.Get<ConfigHandler>().getSongDir() + @"\Pictures\eman.png");
+                await audio.SendFileAsync(Context, config.getSongDir() + @"\Pictures\eman.png");
             }
             else if (e.Result.Text.Equals(arrList[5]))
             {
-                DependencyMap.Get<DiscordBot>().sendRandom(Context);
+                client.sendRandom(Context);
             }
             else if (e.Result.Text.Equals(arrList[6]))
             {
-                var audioClient = await DependencyMap.Get<AudioService>().ConnectAudio(Context);
+                var audioClient = await audio.ConnectAudio(Context);
                 if (audioClient == null)
                     return;
-                DependencyMap.Get<AudioService>().SendAsync(audioClient, DependencyMap.Get<ConfigHandler>().getSongDir() + @"\Andy_Ext.ogg");
+                audio.SendAsync(audioClient, config.getSongDir() + @"\Andy_Ext.ogg");
             }
         }
     }

@@ -7,7 +7,7 @@ using System.Threading.Tasks;
 
 namespace DiscordBot
 {
-    class ConfigHandler
+    public class ConfigHandler
     {
         private Config conf;
         private string configPath, line;

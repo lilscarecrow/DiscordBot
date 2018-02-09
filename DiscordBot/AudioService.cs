@@ -9,8 +9,13 @@ namespace DiscordBot
 {
     public class AudioService
     {
-        public IDependencyMap DependencyMap { get; set; }
-        public CommandService CommandService { get; set; }
+        public ConfigHandler config;
+        //public CommandService CommandService { get; set; }
+
+        public AudioService(ConfigHandler conf)
+        {
+            config = conf;
+        }
 
         public async Task<IAudioClient> ConnectAudio(SocketCommandContext context)
         {

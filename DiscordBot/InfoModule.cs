@@ -16,22 +16,26 @@ namespace DiscordBot
 {
     public class InfoModule : ModuleBase<SocketCommandContext>
     {
-        public IDependencyMap DependencyMap { get; set; }
+        public AudioService audio { get; set; }
+        public ConfigHandler config { get; set; }
+        public VoiceService voice { get; set; }
+        public DiscordBot client { get; set; }
+        public Smite smite { get; set; }
         public CommandService CommandService { get; set; }
 
         private Reddit reddit = new Reddit();
-        private Dictionary<ulong, Dictionary<Stopwatch, long>> timerDict = new Dictionary<ulong, Dictionary<Stopwatch, long>>();
+        //private Dictionary<ulong, Dictionary<Stopwatch, long>> timerDict = new Dictionary<ulong, Dictionary<Stopwatch, long>>();
 
         [Command("numb", RunMode = RunMode.Async)]
         [Summary("By Lincoln Bark")]
         [RequireContext(ContextType.Guild)]
         public async Task Numb()
         {
-            var audioClient = await DependencyMap.Get<AudioService>().ConnectAudio(Context);
+            var audioClient = await audio.ConnectAudio(Context);
             if (audioClient == null)
                 return;
-            await DependencyMap.Get<AudioService>().SendFileAsync(Context, DependencyMap.Get<ConfigHandler>().getSongDir() + @"\Pictures\doggo.jpg");
-            await DependencyMap.Get<AudioService>().SendAsync(audioClient, DependencyMap.Get<ConfigHandler>().getSongDir() + @"\numb.mp3");
+            await audio.SendFileAsync(Context, config.getSongDir() + @"\Pictures\doggo.jpg");
+            await audio.SendAsync(audioClient, config.getSongDir() + @"\numb.mp3");
         }
 
         [Command("betteroffdoggo", RunMode = RunMode.Async)]
@@ -39,11 +43,11 @@ namespace DiscordBot
         [RequireContext(ContextType.Guild)]
         public async Task DogAlone()
         {
-            var audioClient = await DependencyMap.Get<AudioService>().ConnectAudio(Context);
+            var audioClient = await audio.ConnectAudio(Context);
             if (audioClient == null)
                 return;
-            await DependencyMap.Get<AudioService>().SendFileAsync(Context, DependencyMap.Get<ConfigHandler>().getSongDir() + @"\Pictures\doggo.jpg");
-            await DependencyMap.Get<AudioService>().SendAsync(audioClient, DependencyMap.Get<ConfigHandler>().getSongDir() + @"\dogalone.mp3");
+            await audio.SendFileAsync(Context, config.getSongDir() + @"\Pictures\doggo.jpg");
+            await audio.SendAsync(audioClient, config.getSongDir() + @"\dogalone.mp3");
         }
 
         [Command("stop", RunMode = RunMode.Async)]
@@ -51,10 +55,10 @@ namespace DiscordBot
         [RequireContext(ContextType.Guild)]
         public async Task Stop()
         {
-            var audioClient = await DependencyMap.Get<AudioService>().ConnectAudio(Context);
+            var audioClient = await audio.ConnectAudio(Context);
             if (audioClient == null)
                 return;
-            DependencyMap.Get<AudioService>().SendAsync(audioClient, DependencyMap.Get<ConfigHandler>().getSongDir() + @"\stop.mp3");
+            audio.SendAsync(audioClient, config.getSongDir() + @"\stop.mp3");
             await Task.Delay(1000);
             await Context.Guild.AFKChannel.ConnectAsync();
         }
@@ -64,16 +68,16 @@ namespace DiscordBot
         [RequireContext(ContextType.Guild)]
         public async Task Roulette()
         {
-            var audioClient = await DependencyMap.Get<AudioService>().ConnectAudio(Context);
+            var audioClient = await audio.ConnectAudio(Context);
             if (audioClient == null)
                 return;
             SocketGuildUser user = Context.User as SocketGuildUser;
             IVoiceChannel chan = user.VoiceChannel;
-            IEnumerable<IGuildUser> boysArr = await chan.GetUsersAsync().Flatten();
+            IEnumerable<IGuildUser> boysArr = await chan.GetUsersAsync().FlattenAsync();
             IGuildUser[] boys = boysArr.ToArray();
             Random random = new Random();
             int randomNumber = random.Next(0, boys.Length);
-            DependencyMap.Get<AudioService>().SendAsync(audioClient, DependencyMap.Get<ConfigHandler>().getSongDir() + @"\jaws.mp3");
+            audio.SendAsync(audioClient, config.getSongDir() + @"\jaws.mp3");
             await Task.Delay(10000);
             await Context.Channel.SendMessageAsync(boys[randomNumber].Username);
             await boys[randomNumber].ModifyAsync(change =>
@@ -88,13 +92,13 @@ namespace DiscordBot
         [RequireContext(ContextType.Guild)]
         public async Task Mlg()
         {
-            string[] mlg = Directory.GetFiles(DependencyMap.Get<ConfigHandler>().getSongDir() + @"\mlg");
-            var audioClient = await DependencyMap.Get<AudioService>().ConnectAudio(Context);
+            string[] mlg = Directory.GetFiles(config.getSongDir() + @"\mlg");
+            var audioClient = await audio.ConnectAudio(Context);
             if (audioClient == null)
                 return;          
             Random random = new Random();
             int randomNumber = random.Next(0, mlg.Length);
-            await DependencyMap.Get<AudioService>().SendAsync(audioClient, mlg[randomNumber]);
+            await audio.SendAsync(audioClient, mlg[randomNumber]);
         }
 
         [Command("play", RunMode = RunMode.Async)]
@@ -102,10 +106,10 @@ namespace DiscordBot
         [RequireContext(ContextType.Guild)]
         public async Task Play(string url)
         {
-            var audioClient = await DependencyMap.Get<AudioService>().ConnectAudio(Context);
+            var audioClient = await audio.ConnectAudio(Context);
             if (audioClient == null)
                 return;
-            await DependencyMap.Get<AudioService>().Stream(audioClient, url.Split('&')[0]);
+            await audio.Stream(audioClient, url.Split('&')[0]);
         }
 
         [Command("andy", RunMode = RunMode.Async)]
@@ -114,7 +118,7 @@ namespace DiscordBot
         public async Task Andy()
         {
             // Create a request for the URL.   
-            WebRequest request = WebRequest.Create(DependencyMap.Get<ConfigHandler>().getWowKey());
+            WebRequest request = WebRequest.Create(config.getWowKey());
             // Get the response.  
             WebResponse response = await request.GetResponseAsync();
             // Get the stream containing content returned by the server.
@@ -123,12 +127,12 @@ namespace DiscordBot
             StreamReader reader = new StreamReader(dataStream);
             // Read the content.  
             string responseFromServer = await reader.ReadToEndAsync();
-            DiscordBot.CharacterInfo info = DependencyMap.Get<DiscordBot>().getInfoObject(responseFromServer);
+            DiscordBot.CharacterInfo info = client.getInfoObject(responseFromServer);
             // Clean up the streams and the response.  
             reader.Close();
             response.Close();
             int total = info.mounts.numNotCollected + info.mounts.numCollected;
-            await DependencyMap.Get<AudioService>().SendTextAsync(Context, "Andy has collected " + info.mounts.numCollected + "/" + total + " mounts in Azeroth");
+            await audio.SendTextAsync(Context, "Andy has collected " + info.mounts.numCollected + "/" + total + " mounts in Azeroth");
         }
 
         [Command("listen", RunMode = RunMode.Async)]
@@ -136,10 +140,10 @@ namespace DiscordBot
         [RequireContext(ContextType.Guild)]
         public async Task Listen()
         {
-            var audioClient = await DependencyMap.Get<AudioService>().ConnectAudio(Context);
+            var audioClient = await audio.ConnectAudio(Context);
             if (audioClient == null)
                 return;
-            DependencyMap.Get<VoiceService>().setContext(Context);
+            voice.setContext(Context);
         }
 
         [Command("ignore", RunMode = RunMode.Async)]
@@ -147,7 +151,7 @@ namespace DiscordBot
         [RequireContext(ContextType.Guild)]
         public async Task Ignore()
         {
-            DependencyMap.Get<VoiceService>().stopContext();
+            voice.stopContext();
         }
 
         [Command("reddit", RunMode = RunMode.Async)]
@@ -165,11 +169,11 @@ namespace DiscordBot
                     if (!post.NSFW)
                         builder.Append(Convert.ToString(post.Url) + "\n");
                 }
-                await DependencyMap.Get<AudioService>().SendTextAsync(Context, builder.Length == 0 ? "N/A" : builder.ToString());
+                await audio.SendTextAsync(Context, builder.Length == 0 ? "N/A" : builder.ToString());
             }
             catch(Exception ex)
             {
-                await DependencyMap.Get<AudioService>().SendTextAsync(Context, ex.Message);
+                await audio.SendTextAsync(Context, ex.Message);
             }
         }
 
@@ -181,7 +185,7 @@ namespace DiscordBot
             try
             {
                 StringBuilder builder = new StringBuilder();
-                List<ModuleInfo> mods = DependencyMap.Get<DiscordBot>().getCommands().Modules.ToList<ModuleInfo>();
+                List<ModuleInfo> mods = client.getCommands().Modules.ToList<ModuleInfo>();
                 foreach (ModuleInfo mod in mods)
                 {
                     foreach (CommandInfo command in mod.Commands)
@@ -199,12 +203,12 @@ namespace DiscordBot
                         builder.Append("```\n");
                         if (builder.Length >= 1800)
                         {
-                            await DependencyMap.Get<AudioService>().SendTextAsync(Context, builder.Length == 0 ? "N/A" : builder.ToString());
+                            await audio.SendTextAsync(Context, builder.Length == 0 ? "N/A" : builder.ToString());
                             builder.Clear();
                         }
                     }
                 }
-                await DependencyMap.Get<AudioService>().SendTextAsync(Context, builder.Length == 0 ? "N/A" : builder.ToString());
+                await audio.SendTextAsync(Context, builder.Length == 0 ? "N/A" : builder.ToString());
             }
             catch(Exception ex)
             {
@@ -220,16 +224,16 @@ namespace DiscordBot
         { 
             if (param.ToLower().Equals("random"))
             {
-                Gods god = DependencyMap.Get<Smite>().getRandomGod();
-                await DependencyMap.Get<AudioService>().SendTextAsync(Context, god.Name);
+                Gods god = smite.getRandomGod();
+                await audio.SendTextAsync(Context, god.Name);
             }
             else if(param.ToLower().Equals("refresh"))
             {
-                await DependencyMap.Get<Smite>().CreateSession();
+                await smite.CreateSession();
             }
             else
             {
-                await DependencyMap.Get<AudioService>().SendTextAsync(Context, "Invalid parameter!");
+                await audio.SendTextAsync(Context, "Invalid parameter!");
             }
         }
 

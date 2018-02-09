@@ -13,14 +13,15 @@ using Newtonsoft.Json;
 using System.Security.AccessControl;
 using System.Reflection;
 using System.Timers;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace DiscordBot
 {
-    class DiscordBot
+    public class DiscordBot
     {
         private CommandService commands;
         private DiscordSocketClient client;
-        private DependencyMap map;
+        private IServiceProvider services;
         private WebClient webClient = new WebClient();
         private ModuleInfo customModule;
         private Dictionary<string, string> songList = new Dictionary<string, string>();
@@ -87,48 +88,39 @@ namespace DiscordBot
         {
             client = new DiscordSocketClient();
             client.Ready += readyCheck;
+            client.MessageReceived += HandleCommand;
+            client.Log += Log;
             commands = new CommandService();
             random = new Random();
             timer = new Timer(getRandomSeed());
             timer.Elapsed += timerTick;
             timer.Start();
-            client.Log += Log;
 
-            map = new DependencyMap();
+            services = new ServiceCollection()
+                .AddSingleton(this)
+                .AddSingleton(client)
+                .AddSingleton(commands)
+                .AddSingleton<ConfigHandler>()
+                .AddSingleton<AudioService>()
+                .AddSingleton<VoiceService>()
+                .AddSingleton<Smite>()
+                .BuildServiceProvider();
 
-            map.Add(new ConfigHandler());
-
-            await map.Get<ConfigHandler>().populateConfig();
-
-            map.Add(new AudioService());
-
-            map.Add(new VoiceService());
-
-            map.Add(new Smite());
-
-            map.Add(this);
+            await services.GetService<ConfigHandler>().populateConfig();
 
             await generateCommands();
 
-            await InstallCommands();
+            await addCommands();
 
-            map.Get<VoiceService>().DependencyMap = map;
-            map.Get<Smite>().DependencyMap = map;
+            await commands.AddModulesAsync(Assembly.GetEntryAssembly());
 
-            map.Get<VoiceService>().init(songList);//Used to load custom commands into speech
+            await services.GetService<VoiceService>().init(songList);//Used to load custom commands into speech
+            
+            await services.GetService<Smite>().CreateSession();
 
-            await map.Get<Smite>().CreateSession();
-
-            await client.LoginAsync(TokenType.Bot, map.Get<ConfigHandler>().getToken());
+            await client.LoginAsync(TokenType.Bot, services.GetService<ConfigHandler>().getToken());
             await client.StartAsync();
             await Task.Delay(-1);
-        }
-
-        public async Task InstallCommands()
-        {
-            client.MessageReceived += HandleCommand;
-            await commands.AddModulesAsync(Assembly.GetEntryAssembly());
-            await addCommands();
         }
 
         public async Task HandleCommand(SocketMessage messageParam)
@@ -138,7 +130,7 @@ namespace DiscordBot
             int argPos = 0;
             if (!(message.HasCharPrefix('!', ref argPos) || message.HasMentionPrefix(client.CurrentUser, ref argPos))) return;
             var context = new SocketCommandContext(client, message);
-            var result = await commands.ExecuteAsync(context, argPos, map);
+            var result = await commands.ExecuteAsync(context, argPos, services);
             if (!result.IsSuccess)
             {
                 await context.Channel.SendMessageAsync(result.ErrorReason);
@@ -147,7 +139,7 @@ namespace DiscordBot
 
         private async Task addCommands()
         {
-            await commands.CreateModuleAsync("", module =>
+            customModule = await commands.CreateModuleAsync("", module =>
             {
                 foreach(string entry in songList.Keys)
                 {
@@ -166,16 +158,14 @@ namespace DiscordBot
                 });
                 module.Name = "Custom Module";
             });
-
-            customModule = commands.Modules.ElementAt(1);
             Console.WriteLine("DONE LOADING CUSTOM COMMANDS");
         }
 
-        private async Task sendAuto(ICommandContext context, object[] parameters, IDependencyMap map)
+        private async Task sendAuto(ICommandContext context, object[] parameters, IServiceProvider service, CommandInfo info)
         {
             SocketCommandContext Context = context as SocketCommandContext;
-            var audio = await map.Get<AudioService>().ConnectAudio(Context);
-            await map.Get<AudioService>().SendAsync(audio, songList[Context.Message.ToString().Substring(1)]);
+            var audio = await service.GetService<AudioService>().ConnectAudio(Context);
+            await service.GetService<AudioService>().SendAsync(audio, songList[Context.Message.ToString().Substring(1)]);
         }
 
         private async Task readyCheck()
@@ -194,8 +184,8 @@ namespace DiscordBot
                 timer.Stop();
                 timer.Interval = getRandomSeed();
                 List<SocketVoiceChannel> channels = guilds[0].VoiceChannels.ToList();
-                IAudioClient audioClient = await map.Get<AudioService>().ConnectAudioRandom(channels[random.Next(channels.Count)]);
-                await map.Get<AudioService>().SendAsync(audioClient, map.Get<ConfigHandler>().getSongDir() + @"\john.mp3");
+                IAudioClient audioClient = await services.GetService<AudioService>().ConnectAudioRandom(channels[random.Next(channels.Count)]);
+                await services.GetService<AudioService>().SendAsync(audioClient, services.GetService<ConfigHandler>().getSongDir() + @"\john.mp3");
                 timer.Start();
             }
             catch(TimeoutException ex)
@@ -207,9 +197,9 @@ namespace DiscordBot
         public async Task sendRandom(SocketCommandContext context)
         {
             SocketCommandContext Context = context as SocketCommandContext;
-            var audio = await map.Get<AudioService>().ConnectAudio(Context);
+            var audio = await services.GetService<AudioService>().ConnectAudio(Context);
             Random rand = new Random();
-            await map.Get<AudioService>().SendAsync(audio, songList.ElementAt(rand.Next(0, songList.Count)).Value);
+            await services.GetService<AudioService>().SendAsync(audio, songList.ElementAt(rand.Next(0, songList.Count)).Value);
         }
 
         public CommandService getCommands()
@@ -222,7 +212,7 @@ namespace DiscordBot
             return JsonConvert.DeserializeObject<CharacterInfo>(rawResponse);
         }
 
-        private async Task addSong(ICommandContext context, object[] parameters, IDependencyMap map)
+        private async Task addSong(ICommandContext context, object[] parameters, IServiceProvider services, CommandInfo info)
         {
             if (context.Message.Attachments.Count != 1)
             {
@@ -233,7 +223,7 @@ namespace DiscordBot
             IAttachment att = context.Message.Attachments.First();
             if (att.Filename.EndsWith(".mp3"))
             {
-                string filePath = Path.Combine(map.Get<ConfigHandler>().getSongDir(), att.Filename).Replace(@"\", @"\\");
+                string filePath = Path.Combine(services.GetService<ConfigHandler>().getSongDir(), att.Filename).Replace(@"\", @"\\");
                 webClient.DownloadFile(att.Url, filePath);
                 MP3 mp3 = new MP3
                 {
@@ -243,7 +233,7 @@ namespace DiscordBot
                 try
                 {
                     songList.Add(mp3.command, mp3.name);
-                    using (StreamWriter sw = File.AppendText(map.Get<ConfigHandler>().getSongConf()))
+                    using (StreamWriter sw = File.AppendText(services.GetService<ConfigHandler>().getSongConf()))
                     {
                         sw.WriteLine(JsonConvert.SerializeObject(mp3));
                     }
@@ -262,18 +252,18 @@ namespace DiscordBot
         {
             MP3 song;
 
-            if (!File.Exists(map.Get<ConfigHandler>().getSongConf()))
+            if (!File.Exists(services.GetService<ConfigHandler>().getSongConf()))
             {
-                using (var f = File.Create(map.Get<ConfigHandler>().getSongConf()))
+                using (var f = File.Create(services.GetService<ConfigHandler>().getSongConf()))
                 {
-                    DirectoryInfo dInfo = new DirectoryInfo(map.Get<ConfigHandler>().getSongConf());
+                    DirectoryInfo dInfo = new DirectoryInfo(services.GetService<ConfigHandler>().getSongConf());
                     DirectorySecurity dSecurity = dInfo.GetAccessControl();
                     dSecurity.AddAccessRule(new FileSystemAccessRule("everyone", FileSystemRights.FullControl, InheritanceFlags.ObjectInherit | InheritanceFlags.ContainerInherit, PropagationFlags.NoPropagateInherit, AccessControlType.Allow));
                     dInfo.SetAccessControl(dSecurity);
                 }
             }
 
-            using (StreamReader reader = new StreamReader(map.Get<ConfigHandler>().getSongConf()))
+            using (StreamReader reader = new StreamReader(services.GetService<ConfigHandler>().getSongConf()))
             {
                 while ((line = reader.ReadLine()) != null)
                 {

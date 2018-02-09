@@ -12,15 +12,15 @@ using Discord.Commands;
 
 namespace DiscordBot
 {
-    class Smite
+    public class Smite
     {
-        public IDependencyMap DependencyMap { get; set; }
+        private ConfigHandler config;
         private string devKey, authKey, timestamp, urlPrefix, signature, session;
         private List<Gods> gods;
         private List<Items> items;
         private Random random;
 
-        public Smite()
+        public Smite(ConfigHandler conf)
         {
             timestamp = "";
             urlPrefix = "http://api.smitegame.com/smiteapi.svc/";
@@ -29,6 +29,7 @@ namespace DiscordBot
             gods = null;
             items = null;
             random = new Random();
+            config = conf;
         }
 
         public Gods getRandomGod()
@@ -71,8 +72,8 @@ namespace DiscordBot
 
         public async Task CreateSession()
         {
-            devKey = DependencyMap.Get<ConfigHandler>().getSmiteDevKey();
-            authKey = DependencyMap.Get<ConfigHandler>().getSmiteAuthKey();
+            devKey = config.getSmiteDevKey();
+            authKey = config.getSmiteAuthKey();
             timestamp = DateTime.UtcNow.ToString("yyyyMMddHHmmss");
             signature = GetMD5Hash(devKey + "createsession" + authKey + timestamp);
             WebRequest request = WebRequest.Create(urlPrefix + "createsessionjson/" + devKey + "/" + signature + "/" + timestamp);
