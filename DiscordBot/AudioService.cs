@@ -48,7 +48,7 @@ namespace DiscordBot
         {
             var ffmpeg = CreateStream(path);
             var output = ffmpeg.StandardOutput.BaseStream;
-            var discord = client.CreatePCMStream(AudioApplication.Mixed, 1920);
+            var discord = client.CreatePCMStream(AudioApplication.Mixed, 96000);
             await output.CopyToAsync(discord);
             await discord.FlushAsync();
             //if (DependencyMap.Get<VoiceService>().inUse()) BROKEN??????
@@ -69,7 +69,7 @@ namespace DiscordBot
         {
             var ffmpeg = CreateYoutubeStream(url);
             var output = ffmpeg.StandardOutput.BaseStream;
-            var discord = client.CreatePCMStream(AudioApplication.Mixed, 1920);
+            var discord = client.CreatePCMStream(AudioApplication.Mixed, 96000);
             await output.CopyToAsync(discord);
             await discord.FlushAsync();
             //if (DependencyMap.Get<VoiceService>().inUse()) BROKEN????????
