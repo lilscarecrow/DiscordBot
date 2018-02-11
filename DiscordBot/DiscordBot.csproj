@@ -343,8 +343,9 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="AudioService.cs" />
+    <Compile Include="SteamService.cs" />
     <Compile Include="ConfigHandler.cs" />
-    <Compile Include="Smite.cs" />
+    <Compile Include="SmiteService.cs" />
     <Compile Include="DiscordBot.cs" />
     <Compile Include="InfoModule.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />

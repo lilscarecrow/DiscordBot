@@ -60,6 +60,11 @@ namespace DiscordBot
             await context.Channel.SendMessageAsync(text);
         }
 
+        public async Task SendTextWithoutContextAsync(ISocketMessageChannel channel, string text)
+        {
+            await channel.SendMessageAsync(text);
+        }
+
         public async Task SendFileAsync(SocketCommandContext context, string path)
         {
             await context.Channel.SendFileAsync(path);

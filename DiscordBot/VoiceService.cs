@@ -34,7 +34,7 @@ namespace DiscordBot
         public async Task init(Dictionary<string, string> songList)
         {
             arrList = new ArrayList();
-            arrList.AddRange(config.getSpeechArgs());
+            arrList.AddRange(config.GetSpeechArgs());
 
             foreach (string song in songList.Keys)
             {
@@ -122,26 +122,26 @@ namespace DiscordBot
             }
             else if (e.Result.Text.Equals(arrList[2]))
             {
-                await audio.SendFileAsync(Context, config.getSongDir() + @"\Pictures\doggo.jpg");
+                await audio.SendFileAsync(Context, config.GetSongDir() + @"\Pictures\doggo.jpg");
             }
             else if (e.Result.Text.Equals(arrList[3]))
             {
-                await audio.SendFileAsync(Context, config.getSongDir() + @"\Pictures\comm_abby.PNG");
+                await audio.SendFileAsync(Context, config.GetSongDir() + @"\Pictures\comm_abby.PNG");
             }
             else if (e.Result.Text.Equals(arrList[4]))
             {
-                await audio.SendFileAsync(Context, config.getSongDir() + @"\Pictures\eman.png");
+                await audio.SendFileAsync(Context, config.GetSongDir() + @"\Pictures\eman.png");
             }
             else if (e.Result.Text.Equals(arrList[5]))
             {
-                client.sendRandom(Context);
+                client.SendRandom(Context);
             }
             else if (e.Result.Text.Equals(arrList[6]))
             {
                 var audioClient = await audio.ConnectAudio(Context);
                 if (audioClient == null)
                     return;
-                audio.SendAsync(audioClient, config.getSongDir() + @"\Andy_Ext.ogg");
+                audio.SendAsync(audioClient, config.GetSongDir() + @"\Andy_Ext.ogg");
             }
         }
     }

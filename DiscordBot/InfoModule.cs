@@ -20,8 +20,9 @@ namespace DiscordBot
         public ConfigHandler config { get; set; }
         public VoiceService voice { get; set; }
         public DiscordBot client { get; set; }
-        public Smite smite { get; set; }
+        public SmiteService smite { get; set; }
         public CommandService CommandService { get; set; }
+        public SteamService steam { get; set; }
 
         private Reddit reddit = new Reddit();
         //private Dictionary<ulong, Dictionary<Stopwatch, long>> timerDict = new Dictionary<ulong, Dictionary<Stopwatch, long>>();
@@ -34,8 +35,8 @@ namespace DiscordBot
             var audioClient = await audio.ConnectAudio(Context);
             if (audioClient == null)
                 return;
-            await audio.SendFileAsync(Context, config.getSongDir() + @"\Pictures\doggo.jpg");
-            await audio.SendAsync(audioClient, config.getSongDir() + @"\numb.mp3");
+            await audio.SendFileAsync(Context, config.GetSongDir() + @"\Pictures\doggo.jpg");
+            await audio.SendAsync(audioClient, config.GetSongDir() + @"\numb.mp3");
         }
 
         [Command("betteroffdoggo", RunMode = RunMode.Async)]
@@ -46,8 +47,8 @@ namespace DiscordBot
             var audioClient = await audio.ConnectAudio(Context);
             if (audioClient == null)
                 return;
-            await audio.SendFileAsync(Context, config.getSongDir() + @"\Pictures\doggo.jpg");
-            await audio.SendAsync(audioClient, config.getSongDir() + @"\dogalone.mp3");
+            await audio.SendFileAsync(Context, config.GetSongDir() + @"\Pictures\doggo.jpg");
+            await audio.SendAsync(audioClient, config.GetSongDir() + @"\dogalone.mp3");
         }
 
         [Command("stop", RunMode = RunMode.Async)]
@@ -58,7 +59,7 @@ namespace DiscordBot
             var audioClient = await audio.ConnectAudio(Context);
             if (audioClient == null)
                 return;
-            audio.SendAsync(audioClient, config.getSongDir() + @"\stop.mp3");
+            audio.SendAsync(audioClient, config.GetSongDir() + @"\stop.mp3");
             await Task.Delay(1000);
             await Context.Guild.AFKChannel.ConnectAsync();
         }
@@ -77,7 +78,7 @@ namespace DiscordBot
             IGuildUser[] boys = boysArr.ToArray();
             Random random = new Random();
             int randomNumber = random.Next(0, boys.Length);
-            audio.SendAsync(audioClient, config.getSongDir() + @"\jaws.mp3");
+            audio.SendAsync(audioClient, config.GetSongDir() + @"\jaws.mp3");
             await Task.Delay(10000);
             await Context.Channel.SendMessageAsync(boys[randomNumber].Username);
             await boys[randomNumber].ModifyAsync(change =>
@@ -92,7 +93,7 @@ namespace DiscordBot
         [RequireContext(ContextType.Guild)]
         public async Task Mlg()
         {
-            string[] mlg = Directory.GetFiles(config.getSongDir() + @"\mlg");
+            string[] mlg = Directory.GetFiles(config.GetSongDir() + @"\mlg");
             var audioClient = await audio.ConnectAudio(Context);
             if (audioClient == null)
                 return;          
@@ -118,7 +119,7 @@ namespace DiscordBot
         public async Task Andy()
         {
             // Create a request for the URL.   
-            WebRequest request = WebRequest.Create(config.getWowKey());
+            WebRequest request = WebRequest.Create(config.GetWowKey());
             // Get the response.  
             WebResponse response = await request.GetResponseAsync();
             // Get the stream containing content returned by the server.
@@ -127,7 +128,7 @@ namespace DiscordBot
             StreamReader reader = new StreamReader(dataStream);
             // Read the content.  
             string responseFromServer = await reader.ReadToEndAsync();
-            DiscordBot.CharacterInfo info = client.getInfoObject(responseFromServer);
+            DiscordBot.CharacterInfo info = client.GetInfoObject(responseFromServer);
             // Clean up the streams and the response.  
             reader.Close();
             response.Close();
@@ -185,7 +186,7 @@ namespace DiscordBot
             try
             {
                 StringBuilder builder = new StringBuilder();
-                List<ModuleInfo> mods = client.getCommands().Modules.ToList<ModuleInfo>();
+                List<ModuleInfo> mods = client.GetCommands().Modules.ToList<ModuleInfo>();
                 foreach (ModuleInfo mod in mods)
                 {
                     foreach (CommandInfo command in mod.Commands)
@@ -237,44 +238,56 @@ namespace DiscordBot
             }
         }
 
-        /*
-
-                [Command("timer", RunMode = RunMode.Async)]
-                [Summary("A friendly reminder")]
-                [RequireContext(ContextType.Guild)]
-                public async Task Timer([Summary("Time in minutes")] int time, [Summary("The message to be displayed")] [Remainder] string message)
-                {
-                    Dictionary<Stopwatch, long> nestDict;
-                    Stopwatch temp = new Stopwatch();
-
-                    if (timerDict.ContainsKey(Context.User.Id))
-                    {
-                        nestDict = timerDict[Context.User.Id];
-                        nestDict.Add(temp, time * 60000);
-                    }
-                    else
-                    {
-                        nestDict = new Dictionary<Stopwatch, long>();
-                        nestDict.Add(temp, time * 60000);
-                        timerDict.Add(Context.User.Id, nestDict);
-                    }
-
-                    temp.Start();
-                    await Task.Delay(time * 60000);
-                    nestDict.Remove(temp);
-                    await DependencyMap.Get<AudioService>().SendTextAsync(Context, message);
-                }
-
-                [Command("remaining", RunMode = RunMode.Async)]
-                [Summary("A friendly remainder")]
-                [RequireContext(ContextType.Guild)]
-                public async Task Remaining()
-                {
-                    foreach (Stopwatch watch in timerDict[Context.User.Id].Keys)
-                    {
-                        await DependencyMap.Get<AudioService>().SendTextAsync(Context, ("Time remaining: " + (timerDict[Context.User.Id][watch] - watch.ElapsedMilliseconds) / 1000));
-                    }
-                }
-        */
+        [Command("stats", RunMode = RunMode.Async)]
+        [Summary("Steam Stats")]
+        [RequireContext(ContextType.Guild)]
+        public async Task SteamStats([Remainder] string gameName)
+        {
+            var result = await steam.FindGame(gameName);
+            if (result != null)
+                await audio.SendTextAsync(Context, result);
+            else
+                await audio.SendTextAsync(Context, "Game Not Found!");
     }
+
+    /*
+
+            [Command("timer", RunMode = RunMode.Async)]
+            [Summary("A friendly reminder")]
+            [RequireContext(ContextType.Guild)]
+            public async Task Timer([Summary("Time in minutes")] int time, [Summary("The message to be displayed")] [Remainder] string message)
+            {
+                Dictionary<Stopwatch, long> nestDict;
+                Stopwatch temp = new Stopwatch();
+
+                if (timerDict.ContainsKey(Context.User.Id))
+                {
+                    nestDict = timerDict[Context.User.Id];
+                    nestDict.Add(temp, time * 60000);
+                }
+                else
+                {
+                    nestDict = new Dictionary<Stopwatch, long>();
+                    nestDict.Add(temp, time * 60000);
+                    timerDict.Add(Context.User.Id, nestDict);
+                }
+
+                temp.Start();
+                await Task.Delay(time * 60000);
+                nestDict.Remove(temp);
+                await DependencyMap.Get<AudioService>().SendTextAsync(Context, message);
+            }
+
+            [Command("remaining", RunMode = RunMode.Async)]
+            [Summary("A friendly remainder")]
+            [RequireContext(ContextType.Guild)]
+            public async Task Remaining()
+            {
+                foreach (Stopwatch watch in timerDict[Context.User.Id].Keys)
+                {
+                    await DependencyMap.Get<AudioService>().SendTextAsync(Context, ("Time remaining: " + (timerDict[Context.User.Id][watch] - watch.ElapsedMilliseconds) / 1000));
+                }
+            }
+    */
+}
 }

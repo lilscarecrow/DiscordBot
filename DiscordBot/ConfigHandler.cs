@@ -37,7 +37,7 @@ namespace DiscordBot
             };
         }
 
-        public async Task populateConfig()
+        public async Task PopulateConfig()
         {
             configPath = Path.Combine(Directory.GetCurrentDirectory(), "config.json").Replace(@"\", @"\\");
             Console.WriteLine(configPath);
@@ -70,37 +70,37 @@ namespace DiscordBot
             await Task.CompletedTask;
         }
 
-        public string getToken()
+        public string GetToken()
         {
             return conf.token;
         }
 
-        public string getSongDir()
+        public string GetSongDir()
         {
             return conf.songDir;
         }
 
-        public string getSongConf()
+        public string GetSongConf()
         {
             return conf.songConf;
         }
 
-        public string getWowKey()
+        public string GetWowKey()
         {
             return conf.wowKey;
         }
 
-        public string getSmiteDevKey()
+        public string GetSmiteDevKey()
         {
             return conf.smiteDevKey;
         }
 
-        public string getSmiteAuthKey()
+        public string GetSmiteAuthKey()
         {
             return conf.smiteAuthKey;
         }
 
-        public string[] getSpeechArgs()
+        public string[] GetSpeechArgs()
         {
             return conf.speechArgs;
         }

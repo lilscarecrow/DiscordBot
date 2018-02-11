@@ -87,13 +87,14 @@ namespace DiscordBot
         public async Task MainAsync()
         {
             client = new DiscordSocketClient();
-            client.Ready += readyCheck;
+            client.Ready += ReadyCheck;
             client.MessageReceived += HandleCommand;
             client.Log += Log;
+            client.GuildMemberUpdated += HandleUpdate;
             commands = new CommandService();
             random = new Random();
-            timer = new Timer(getRandomSeed());
-            timer.Elapsed += timerTick;
+            timer = new Timer(GetRandomSeed());
+            timer.Elapsed += TimerTick;
             timer.Start();
 
             services = new ServiceCollection()
@@ -103,22 +104,25 @@ namespace DiscordBot
                 .AddSingleton<ConfigHandler>()
                 .AddSingleton<AudioService>()
                 .AddSingleton<VoiceService>()
-                .AddSingleton<Smite>()
+                .AddSingleton<SmiteService>()
+                .AddSingleton<SteamService>()
                 .BuildServiceProvider();
 
-            await services.GetService<ConfigHandler>().populateConfig();
+            await services.GetService<ConfigHandler>().PopulateConfig();
 
-            await generateCommands();
+            await GenerateCommands();
 
-            await addCommands();
+            await AddCommands();
 
             await commands.AddModulesAsync(Assembly.GetEntryAssembly());
 
             await services.GetService<VoiceService>().init(songList);//Used to load custom commands into speech
             
-            await services.GetService<Smite>().CreateSession();
+            await services.GetService<SmiteService>().CreateSession();
 
-            await client.LoginAsync(TokenType.Bot, services.GetService<ConfigHandler>().getToken());
+            await services.GetService<SteamService>().GetData();
+
+            await client.LoginAsync(TokenType.Bot, services.GetService<ConfigHandler>().GetToken());
             await client.StartAsync();
             await Task.Delay(-1);
         }
@@ -137,19 +141,19 @@ namespace DiscordBot
             }      
         }
 
-        private async Task addCommands()
+        private async Task AddCommands()
         {
             customModule = await commands.CreateModuleAsync("", module =>
             {
                 foreach(string entry in songList.Keys)
                 {
-                    module.AddCommand(entry, sendAuto, cmd =>
+                    module.AddCommand(entry, SendAuto, cmd =>
                     {
                         cmd.RunMode = RunMode.Async;
                     });
                 }
 
-                module.AddCommand("add", addSong, cmd =>
+                module.AddCommand("add", AddSong, cmd =>
                 {
                     cmd.AddParameter<string>("command", para =>
                     {
@@ -161,14 +165,14 @@ namespace DiscordBot
             Console.WriteLine("DONE LOADING CUSTOM COMMANDS");
         }
 
-        private async Task sendAuto(ICommandContext context, object[] parameters, IServiceProvider service, CommandInfo info)
+        private async Task SendAuto(ICommandContext context, object[] parameters, IServiceProvider service, CommandInfo info)
         {
             SocketCommandContext Context = context as SocketCommandContext;
             var audio = await service.GetService<AudioService>().ConnectAudio(Context);
             await service.GetService<AudioService>().SendAsync(audio, songList[Context.Message.ToString().Substring(1)]);
         }
 
-        private async Task readyCheck()
+        private async Task ReadyCheck()
         {
             guilds = client.Guilds.ToList();
             foreach (SocketGuild serv in client.Guilds)
@@ -177,15 +181,25 @@ namespace DiscordBot
             }
         }
 
-        private async void timerTick(object sender, ElapsedEventArgs e)
+        private async Task HandleUpdate(SocketGuildUser before, SocketGuildUser after)
+        {
+            Console.WriteLine("USER: " + after.Username + " ACTIVITY: " + after.Activity.Name);
+            var result = await services.GetService<SteamService>().FindGame(after.Activity.Name.ToLower().Trim());
+            if (result != null)
+            {
+                await services.GetService<AudioService>().SendTextWithoutContextAsync(after.Guild.DefaultChannel, result);
+            }    
+        }
+
+        private async void TimerTick(object sender, ElapsedEventArgs e)
         {
             try
             {
                 timer.Stop();
-                timer.Interval = getRandomSeed();
+                timer.Interval = GetRandomSeed();
                 List<SocketVoiceChannel> channels = guilds[0].VoiceChannels.ToList();
                 IAudioClient audioClient = await services.GetService<AudioService>().ConnectAudioRandom(channels[random.Next(channels.Count)]);
-                await services.GetService<AudioService>().SendAsync(audioClient, services.GetService<ConfigHandler>().getSongDir() + @"\john.mp3");
+                await services.GetService<AudioService>().SendAsync(audioClient, services.GetService<ConfigHandler>().GetSongDir() + @"\john.mp3");
                 timer.Start();
             }
             catch(TimeoutException ex)
@@ -194,7 +208,7 @@ namespace DiscordBot
             }
         }
 
-        public async Task sendRandom(SocketCommandContext context)
+        public async Task SendRandom(SocketCommandContext context)
         {
             SocketCommandContext Context = context as SocketCommandContext;
             var audio = await services.GetService<AudioService>().ConnectAudio(Context);
@@ -202,17 +216,17 @@ namespace DiscordBot
             await services.GetService<AudioService>().SendAsync(audio, songList.ElementAt(rand.Next(0, songList.Count)).Value);
         }
 
-        public CommandService getCommands()
+        public CommandService GetCommands()
         {
             return commands;
         }
 
-        public CharacterInfo getInfoObject(string rawResponse)
+        public CharacterInfo GetInfoObject(string rawResponse)
         {
             return JsonConvert.DeserializeObject<CharacterInfo>(rawResponse);
         }
 
-        private async Task addSong(ICommandContext context, object[] parameters, IServiceProvider services, CommandInfo info)
+        private async Task AddSong(ICommandContext context, object[] parameters, IServiceProvider services, CommandInfo info)
         {
             if (context.Message.Attachments.Count != 1)
             {
@@ -223,7 +237,7 @@ namespace DiscordBot
             IAttachment att = context.Message.Attachments.First();
             if (att.Filename.EndsWith(".mp3"))
             {
-                string filePath = Path.Combine(services.GetService<ConfigHandler>().getSongDir(), att.Filename).Replace(@"\", @"\\");
+                string filePath = Path.Combine(services.GetService<ConfigHandler>().GetSongDir(), att.Filename).Replace(@"\", @"\\");
                 webClient.DownloadFile(att.Url, filePath);
                 MP3 mp3 = new MP3
                 {
@@ -233,12 +247,12 @@ namespace DiscordBot
                 try
                 {
                     songList.Add(mp3.command, mp3.name);
-                    using (StreamWriter sw = File.AppendText(services.GetService<ConfigHandler>().getSongConf()))
+                    using (StreamWriter sw = File.AppendText(services.GetService<ConfigHandler>().GetSongConf()))
                     {
                         sw.WriteLine(JsonConvert.SerializeObject(mp3));
                     }
                     await commands.RemoveModuleAsync(customModule);
-                    await addCommands();
+                    await AddCommands();
                 }
                 catch (ArgumentException ex)
                 {
@@ -248,22 +262,22 @@ namespace DiscordBot
             }
         }
 
-        private async Task generateCommands()
+        private async Task GenerateCommands()
         {
             MP3 song;
 
-            if (!File.Exists(services.GetService<ConfigHandler>().getSongConf()))
+            if (!File.Exists(services.GetService<ConfigHandler>().GetSongConf()))
             {
-                using (var f = File.Create(services.GetService<ConfigHandler>().getSongConf()))
+                using (var f = File.Create(services.GetService<ConfigHandler>().GetSongConf()))
                 {
-                    DirectoryInfo dInfo = new DirectoryInfo(services.GetService<ConfigHandler>().getSongConf());
+                    DirectoryInfo dInfo = new DirectoryInfo(services.GetService<ConfigHandler>().GetSongConf());
                     DirectorySecurity dSecurity = dInfo.GetAccessControl();
                     dSecurity.AddAccessRule(new FileSystemAccessRule("everyone", FileSystemRights.FullControl, InheritanceFlags.ObjectInherit | InheritanceFlags.ContainerInherit, PropagationFlags.NoPropagateInherit, AccessControlType.Allow));
                     dInfo.SetAccessControl(dSecurity);
                 }
             }
 
-            using (StreamReader reader = new StreamReader(services.GetService<ConfigHandler>().getSongConf()))
+            using (StreamReader reader = new StreamReader(services.GetService<ConfigHandler>().GetSongConf()))
             {
                 while ((line = reader.ReadLine()) != null)
                 {
@@ -274,13 +288,13 @@ namespace DiscordBot
             await Task.CompletedTask;
         }
 
-        private double getRandomSeed()
+        private double GetRandomSeed()
         {
             Console.WriteLine("RANDOM TIMER TICKING!");
             return 180000;
         }
 
-        private async void mysqlConnect()
+        private async void MysqlConnect()
         {
             MySqlConnection conn = null;
             MySqlDataReader rdr = null;
